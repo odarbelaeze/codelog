@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 with open("README.md") as readme_file:
     readme = readme_file.read()
 
-requirements = ["Click>=7<8"]
+requirements = ["Click>=7<8", "toml>=0.10.1<1", "dateparser"]
 
 setup(
     author="Oscar Arbeláez",
