@@ -8,6 +8,29 @@ from typing import Dict, Iterator, List
 import click
 import dateparser
 import toml
+import re
+
+
+def fix(line: str) -> str:
+    line = line.replace('"', "")
+    line = re.sub(r"\(.*\)", "", line)
+    line = re.sub(r"\s+", " ", line)
+    return line
+
+
+def valid(line: str) -> bool:
+    return (
+        line
+        and not line.startswith("Merge")
+        and not line.startswith("index on")
+        and not line.startswith("WIP on")
+    )
+
+
+def ellipsis(source: str, cap: int) -> str:
+    if len(source) > cap:
+        return source[: cap - 3] + "..."
+    return source
 
 
 class Context:
@@ -30,23 +53,13 @@ class Context:
 
     def report(self, start: datetime.datetime, end: datetime.datetime) -> Iterator[str]:
         for path in self.repos:
-            yield path
             try:
-                # subprocess.run(
-                #     [
-                #         "git",
-                #         "pull",
-                #     ],
-                #     cwd=path,
-                #     stderr=subprocess.DEVNULL,
-                #     stdout=subprocess.DEVNULL,
-                # )
                 output = subprocess.check_output(
                     [
                         "git",
                         "--no-pager",
                         "log",
-                        r'--pretty=format:"%ad %an %d %s"',
+                        r"--pretty=format:%s",
                         "--all",
                         "--author=Oscar",
                         f"--before={end.isoformat()}",
@@ -54,7 +67,11 @@ class Context:
                     ],
                     cwd=path,
                 )
-                yield from (line for line in output.decode().split("\n") if line)
+                lines = [fix(line) for line in output.decode().split("\n") if line]
+                if any(line.startswith("Merge") for line in lines):
+                    yield "PR Reviews"
+                lines = [line for line in lines if valid(line)]
+                yield from lines
             except subprocess.CalledProcessError:
                 click.secho("Not a git repository", err=True)
                 sys.exit(1)
@@ -112,10 +129,16 @@ def clear(ctx):
 @click.pass_context
 def report(ctx, date):
     parsed = dateparser.parse(" ".join(date or ["today"]))
-    print(parsed.isoformat())
     start = datetime.datetime.fromordinal(parsed.date().toordinal())
     end = start + datetime.timedelta(hours=23, minutes=59, seconds=59)
-    click.echo("\n".join(ctx.obj.report(start, end)))
+    headers = "date,hours,text"
+    messages = ctx.obj.report(start, end)
+    text = ellipsis(", ".join(messages), 400)
+    if not text.strip():
+        text = "PR Reviews, non coding work"
+    content = ",".join([start.date().isoformat().replace("-", "/"), "8", f'"{text}"'])
+    output = "\n".join([headers, content])
+    click.echo(output)
 
 
 if __name__ == "__main__":
