@@ -15,7 +15,7 @@ def fix(line: str) -> str:
     line = line.replace('"', "")
     line = re.sub(r"\(.*\)", "", line)
     line = re.sub(r"\s+", " ", line)
-    return line
+    return line.strip()
 
 
 def valid(line: str) -> bool:
@@ -136,7 +136,7 @@ def report(ctx, date):
     text = ellipsis(", ".join(messages), 400)
     if not text.strip():
         text = "PR Reviews, non coding work"
-    content = ",".join([start.date().isoformat().replace("-", "/"), "8", f'"{text}"'])
+    content = ",".join([start.strftime("%d/%m/%Y"), "8", f'"{text}"'])
     output = "\n".join([headers, content])
     click.echo(output)
 
