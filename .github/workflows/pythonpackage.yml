@@ -41,6 +41,7 @@ jobs:
 
     - name: Test with sample data
       run: |
+        git config --global user.name "Homer Simpson"
         codelog config init
         codelog config track 
         codelog report
