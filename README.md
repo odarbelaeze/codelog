@@ -6,7 +6,7 @@ Log your coding work.
 
 Install from pypi using:
 
-```console
+```shell
 pip install -U codelog
 ```
 
@@ -14,20 +14,20 @@ pip install -U codelog
 
 Start a configuration file with:
 
-```console
+```shell
 codelog config init
 ```
 
 Track your various repos using:
 
-```console
+```shell
 codelog config track
 ```
 
 Generate your report using:
 
 
-```console
+```shell
 codelog report
 # or for a past date
 codelog report Sept 19
