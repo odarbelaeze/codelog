@@ -133,7 +133,8 @@ class Context:
                 non_merges = [line for line in lines if not line.startswith("Merge")]
                 if len(lines) > len(non_merges):
                     yield f"[{repo.name}]: " + ", ".join(["PR Reviews", *lines])
-                yield f"[{repo.name}]: " + ", ".join(lines)
+                else:
+                    yield f"[{repo.name}]: " + ", ".join(lines)
             except subprocess.CalledProcessError:
                 click.secho('"{path}" is not a git repository', err=True)
                 sys.exit(1)
@@ -246,7 +247,7 @@ def report(ctx, date):
     start = datetime.datetime.fromordinal(parsed.date().toordinal())
     end = start + datetime.timedelta(hours=23, minutes=59, seconds=59)
     headers = "date,hours,text"
-    messages = ctx.obj.report(start, end)
+    messages = list(ctx.obj.report(start, end))
     text = " ".join(balance(messages, ctx.obj.config.limit))
     if not text.strip():
         text = ctx.obj.config.dummy
