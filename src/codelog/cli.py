@@ -133,7 +133,7 @@ class Context:
                     continue
                 non_merges = [line for line in lines if not line.startswith("Merge")]
                 if len(lines) > len(non_merges):
-                    yield f"[{repo.name}]: " + ", ".join(["PR Reviews", *lines])
+                    yield f"[{repo.name}]: " + ", ".join(["PR Reviews", *non_merges])
                 else:
                     yield f"[{repo.name}]: " + ", ".join(lines)
             except subprocess.CalledProcessError:
