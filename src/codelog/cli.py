@@ -95,9 +95,9 @@ class Context:
         try:
             with open(self.config_path) as config_file:
                 self._config = Config(**toml.load(config_file))
-        except ValidationError:
+        except ValidationError as e:
             click.secho(
-                'Your config is invalid, consider "codelog config init"', err=True
+                f'Your config is invalid, consider "codelog config init"\n{e}', err=True
             )
             sys.exit(1)
         return self._config
