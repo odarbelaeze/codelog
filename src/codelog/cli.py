@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Dict, Iterator, List, Optional
 
 import click
 import dateparser
@@ -18,13 +18,13 @@ class Repo(BaseModel):
 
     @validator("path")
     def existing_git_repo(cls, value: str) -> str:
+        assert cls is not None
         if not os.path.exists(value):
             raise ValueError(f'"{value}" does not exist or is not readable.')
         try:
             return cgr(cwd=value)
         except subprocess.CalledProcessError:
             raise ValueError(f'"{value}" is not a valid git repository.')
-        return value
 
 
 class Config(BaseModel):
@@ -109,6 +109,14 @@ class Context:
     def write(self, config: Config):
         with open(self.config_path, "w") as config_file:
             return toml.dump(config.dict(), config_file)
+
+    def fetch(self):
+        for repo in self.repos:
+            try:
+                subprocess.call(["git", "pull"], cwd=repo.path)
+            except subprocess.CalledProcessError:
+                click.secho('"{path}" is not a git repository', err=True)
+                sys.exit(1)
 
     def report(self, start: datetime.datetime, end: datetime.datetime) -> Iterator[str]:
         for repo in self.repos:
@@ -257,6 +265,14 @@ def report(ctx, date):
     )
     output = "\n".join([headers, content])
     click.echo(output)
+
+
+@main.command()
+@click.pass_context
+def fetch(ctx):
+    """Generate your day's work report"""
+    ctx.obj.fetch()
+    click.secho("All repos fetched", fg="green")
 
 
 if __name__ == "__main__":
