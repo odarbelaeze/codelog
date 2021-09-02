@@ -1,10 +1,13 @@
 import datetime
+import csv
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional, Protocol
+
+from arrow import Arrow
 
 import click
 import dateparser
@@ -118,7 +121,9 @@ class Context:
                 click.secho('"{path}" is not a git repository', err=True)
                 sys.exit(1)
 
-    def report(self, start: datetime.datetime, end: datetime.datetime) -> Iterator[str]:
+    def messages(
+        self, start: datetime.datetime, end: datetime.datetime
+    ) -> Iterator[str]:
         for repo in self.repos:
             try:
                 output = subprocess.check_output(
@@ -147,6 +152,27 @@ class Context:
             except subprocess.CalledProcessError:
                 click.secho('"{path}" is not a git repository', err=True)
                 sys.exit(1)
+
+    def report(
+        self,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        limit: Optional[int] = None,
+        default: Optional[str] = None,
+    ) -> str:
+        """
+        Balanced string report of all the projects.
+        """
+        messages = list(self.messages(start, end))
+        if not messages and default:
+            return default
+        if limit:
+            return " ".join(balance(list(messages), limit))
+        return " ".join(messages)
+
+
+class CtxType(Protocol):
+    obj: Context
 
 
 @click.group()
@@ -247,24 +273,41 @@ def edit(ctx):
         sys.exit(1)
 
 
+def date(val: str) -> Arrow:
+    parsed = dateparser.parse(val)
+    if parsed is None:
+        raise ValueError(f'"{val}" is not a valid date')
+    return Arrow.fromdatetime(parsed)
+
+
 @main.command()
-@click.argument("date", nargs=-1)
+@click.option("--from", "start", default="today", help="Start date", type=date)
+@click.option("--to", "end", default="today", help="End date", type=date)
+@click.option("--output", "-o", default="-", help="End date", type=click.File("w"))
 @click.pass_context
-def report(ctx, date):
+def report(ctx: CtxType, start: Arrow, end: Arrow, output: click.File):
     """Generate your day's work report"""
-    parsed = dateparser.parse(" ".join(date or ["today"]))
-    start = datetime.datetime.fromordinal(parsed.date().toordinal())
-    end = start + datetime.timedelta(hours=23, minutes=59, seconds=59)
-    headers = "date,hours,text"
-    messages = list(ctx.obj.report(start, end))
-    text = " ".join(balance(messages, ctx.obj.config.limit))
-    if not text.strip():
-        text = ctx.obj.config.dummy
-    content = ",".join(
-        [start.strftime(ctx.obj.config.datefmt), str(ctx.obj.config.hours), f'"{text}"']
-    )
-    output = "\n".join([headers, content])
-    click.echo(output)
+    headers = ["date", "text", "hours"]
+    rows = [
+        {
+            "date": _from.date(),
+            "text": ctx.obj.report(
+                _from.datetime,
+                _until.datetime,
+                limit=ctx.obj.config.limit,
+                default=ctx.obj.config.dummy,
+            ),
+            "hours": ctx.obj.config.hours,
+        }
+        for _from, _until in Arrow.span_range(
+            "day", start.floor("day").datetime, end.ceil("day").datetime
+        )
+        if _from.weekday() not in (5, 6)
+    ]
+    if rows:
+        writer = csv.DictWriter(output, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 @main.command()
